@@ -1,0 +1,66 @@
+version: "3.9"
+
+services:
+  # ─── BayMax FastAPI Backend ─────────────────────────────────────────────────
+  backend:
+    build: .
+    container_name: baymax-backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      # Override MongoDB host to use Docker service name
+      - MONGODB_URI=mongodb://mongo:27017
+    depends_on:
+      mongo:
+        condition: service_healthy
+    volumes:
+      # Hot-reload app code in development
+      - ./app:/app/app
+    restart: unless-stopped
+    networks:
+      - baymax-network
+
+  # ─── MongoDB ────────────────────────────────────────────────────────────────
+  mongo:
+    image: mongo:7.0
+    container_name: baymax-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - baymax-network
+
+  # ─── Mongo Express (Dev UI) ──────────────────────────────────────────────────
+  mongo-express:
+    image: mongo-express:latest
+    container_name: baymax-mongo-ui
+    ports:
+      - "8081:8081"
+    environment:
+      - ME_CONFIG_MONGODB_SERVER=mongo
+      - ME_CONFIG_MONGODB_PORT=27017
+      - ME_CONFIG_BASICAUTH_USERNAME=admin
+      - ME_CONFIG_BASICAUTH_PASSWORD=admin
+    depends_on:
+      - mongo
+    restart: unless-stopped
+    networks:
+      - baymax-network
+
+volumes:
+  mongo_data:
+    name: baymax_mongo_data
+
+networks:
+  baymax-network:
+    name: baymax-network

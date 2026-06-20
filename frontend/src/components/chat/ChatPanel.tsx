@@ -4,6 +4,8 @@ import { Send, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { chatCompletion, GroqError, getApiKey } from "@/lib/groq";
+import { chatApi } from "@/lib/baymax-api";
+import { KEYS, readLS } from "@/lib/storage";
 import type { ChatMessage } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -34,19 +36,36 @@ export function ChatPanel({
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, loading]);
 
+  const [sessionId, setSessionId] = useState<string | undefined>();
+
   const send = async () => {
     const text = input.trim();
     if (!text || loading) return;
     setError(null);
-    if (!getApiKey()) {
-      setError("Add your Groq API key in Settings to use chat.");
+
+    const token = readLS<string>(KEYS.authToken, "");
+    if (!token && !getApiKey()) {
+      setError("Sign in and run the backend, or add a Groq API key in Settings.");
       return;
     }
+
     const next: ChatMessage[] = [...messages, { role: "user", content: text }];
     setMessages(next);
     setInput("");
     setLoading(true);
     try {
+      if (token) {
+        try {
+          const res = await chatApi.message({ message: text, session_id: sessionId });
+          setSessionId(res.session_id);
+          setMessages((m) => [...m, { role: "assistant", content: res.baymax_response }]);
+          onAssistant?.(res.baymax_response);
+          return;
+        } catch {
+          if (!getApiKey()) throw new Error("Backend unavailable and no Groq key configured.");
+        }
+      }
+
       const reply = await chatCompletion({
         messages: [{ role: "system", content: systemPrompt }, ...next],
       });

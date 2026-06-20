@@ -27,6 +27,7 @@ import type {
 } from "@/lib/types";
 import { INTERVIEW_SYSTEM, chatCompletion, GroqError } from "@/lib/groq";
 import { APP_NAME } from "@/lib/brand";
+import { syncProfileToBackend } from "@/lib/baymax-api";
 
 export const Route = createFileRoute("/onboarding")({
   head: () => ({
@@ -72,6 +73,7 @@ function Onboarding() {
     writeLS(KEYS.groqKey, apiKey);
     writeLS(KEYS.interview, answers);
     writeLS(KEYS.onboarded, true);
+    syncProfileToBackend().catch(() => {});
     navigate({ to: "/" });
   };
 

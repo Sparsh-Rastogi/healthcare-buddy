@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { Eye, EyeOff, Plus, Trash2, AlertTriangle } from "lucide-react";
+import { Eye, EyeOff, Plus, Trash2, AlertTriangle, Save } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,7 @@ import { CONDITION_OPTIONS } from "@/lib/suggestedLogs";
 import { useAuth } from "@/contexts/AuthContext";
 import { APP_NAME } from "@/lib/brand";
 import { cn } from "@/lib/utils";
+import { syncSettingsToBackend } from "@/lib/baymax-api";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({
@@ -90,7 +91,21 @@ function AccountSection() {
 
 function ProfileSection() {
   const [profile, setProfile] = useLocalState<Profile | null>(KEYS.profile, null);
+  const [saving, setSaving] = useState(false);
   if (!profile) return null;
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await syncSettingsToBackend();
+      toast.success("Profile saved");
+    } catch {
+      toast.error("Could not sync to backend");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <SectionCard title="Profile">
       <div className="grid grid-cols-2 gap-3">
@@ -122,6 +137,9 @@ function ProfileSection() {
           </Select>
         </div>
       </div>
+      <Button onClick={handleSave} disabled={saving} className="w-full mt-2">
+        <Save className="h-4 w-4 mr-2" />{saving ? "Saving…" : "Save profile"}
+      </Button>
     </SectionCard>
   );
 }
@@ -129,7 +147,21 @@ function ProfileSection() {
 function ConditionsSection() {
   const [conditions, setConditions] = useLocalState<Condition[]>(KEYS.conditions, []);
   const [custom, setCustom] = useState("");
+  const [saving, setSaving] = useState(false);
   const labels = new Set(conditions.map((c) => c.label));
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await syncSettingsToBackend();
+      toast.success("Conditions saved");
+    } catch {
+      toast.error("Could not sync to backend");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <SectionCard title="Conditions">
       <div className="flex flex-wrap gap-2">
@@ -157,6 +189,9 @@ function ConditionsSection() {
           }}
         ><Plus className="h-4 w-4" /></Button>
       </div>
+      <Button onClick={handleSave} disabled={saving} className="w-full">
+        <Save className="h-4 w-4 mr-2" />{saving ? "Saving…" : "Save conditions"}
+      </Button>
     </SectionCard>
   );
 }
@@ -167,6 +202,20 @@ function MedsSection() {
   const [dosage, setDosage] = useState("");
   const [time, setTime] = useState("08:00");
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await syncSettingsToBackend();
+      toast.success("Medications saved");
+    } catch {
+      toast.error("Could not sync to backend");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <SectionCard title="Medications">
       <div className="grid grid-cols-3 gap-2">
@@ -190,6 +239,9 @@ function MedsSection() {
           </div>
         ))}
       </div>
+      <Button onClick={handleSave} disabled={saving} className="w-full">
+        <Save className="h-4 w-4 mr-2" />{saving ? "Saving…" : "Save medications"}
+      </Button>
       <ConfirmDialog
         open={!!pendingDelete}
         onOpenChange={(o) => !o && setPendingDelete(null)}
@@ -260,6 +312,20 @@ function MetricsSection() {
 function ApiKeySection() {
   const [apiKey, setApiKey] = useLocalState<string>(KEYS.groqKey, "");
   const [show, setShow] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await syncSettingsToBackend();
+      toast.success("API key saved and synced");
+    } catch {
+      toast.error("Could not sync to backend");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <SectionCard title="Groq API Key">
       <div className="relative">
@@ -271,12 +337,29 @@ function ApiKeySection() {
       <p className="text-xs text-muted-foreground">
         Get one at <a className="underline text-primary" target="_blank" rel="noreferrer" href="https://console.groq.com">console.groq.com</a>.
       </p>
+      <Button onClick={handleSave} disabled={saving} className="w-full">
+        <Save className="h-4 w-4 mr-2" />{saving ? "Saving…" : "Save API key"}
+      </Button>
     </SectionCard>
   );
 }
 
 function EmergencySection() {
   const [contact, setContact] = useLocalState<EmergencyContact>(KEYS.emergency, { name: "", phone: "", relationship: "" });
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await syncSettingsToBackend();
+      toast.success("Emergency contact saved");
+    } catch {
+      toast.error("Could not sync to backend");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <SectionCard title="Emergency Contact">
       <div className="grid grid-cols-2 gap-2">
@@ -293,6 +376,9 @@ function EmergencySection() {
           <Input value={contact.relationship} onChange={(e) => setContact({ ...contact, relationship: e.target.value })} />
         </div>
       </div>
+      <Button onClick={handleSave} disabled={saving} className="w-full">
+        <Save className="h-4 w-4 mr-2" />{saving ? "Saving…" : "Save contact"}
+      </Button>
     </SectionCard>
   );
 }

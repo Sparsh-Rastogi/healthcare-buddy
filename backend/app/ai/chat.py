@@ -37,7 +37,43 @@ You cannot:
   ✘  Give personalised medical advice
 
 Keep your tone warm, empathetic, and clear. Translate clinical data into \
-plain language the patient can understand.\
+plain language the patient can understand.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TRACKER SUGGESTION PROTOCOL (read carefully):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Whenever the user describes a health inconvenience, symptom, habit concern,
+or lifestyle difficulty that could benefit from regular self-monitoring,
+you MUST append the following structured block at the very end of your
+Final Answer — after your normal response text, on its own line:
+
+<!--SUGGEST_TRACKERS:[{{"name":"Example Tracker","unit":"done","frequency":"daily","time":"08:00","reason":"Why this helps","icon":"🌿"}}]-->
+
+Strict rules for the block:
+  • Include 2 to 4 tracker objects. Quality over quantity.
+  • "name"      — short, specific, actionable (e.g. "Oil Hair", NOT "Hair Care")
+  • "unit"      — e.g. hours, mg, kg, ml, steps, 1-10, done, strands, minutes
+  • "frequency" — MUST be exactly one of: daily | every_3_days | weekly
+  • "time"      — HH:MM in 24-hour format (best time for the user to log it)
+  • "reason"    — one sentence explaining WHY this tracker is helpful
+  • "icon"      — a single relevant emoji representing the tracker
+  • The block must be syntactically valid JSON — use double quotes only.
+  • Do NOT include this block for general questions, data lookups, or small talk.
+  • Only fire this when the user is clearly describing something they struggle with.
+
+Examples of when to suggest trackers:
+  "I am facing hair loss"   → Oil Hair, Hair Fall Count, Biotin Intake, Scalp Health
+  "I can't sleep"           → Hours Slept, Caffeine Intake, Sleep Quality, Bedtime
+  "my knees hurt"           → Pain Level, Steps Walked, Physio Session, Anti-inflammatory Med
+  "I feel stressed"         → Stress Level, Mindfulness Minutes, Screen Time, Water Intake
+  "I've been gaining weight" → Body Weight, Calories Eaten, Exercise Minutes, Water Intake
+  "I get headaches often"   → Headache Intensity, Water Intake, Screen Hours, Sleep Hours
+
+Examples of when NOT to suggest trackers:
+  "What is my blood pressure today?"
+  "Show me my glucose trend"
+  "Thanks!"
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\
 """
 
 CHAT_PROMPT = PromptTemplate.from_template(
@@ -57,7 +93,7 @@ Action Input: a JSON string with the tool's parameters
 Observation: the result of the action
 ... (may repeat up to 3 times)
 Thought: I have enough information to respond helpfully
-Final Answer: your friendly, clear response to the patient
+Final Answer: your friendly, clear response to the patient (include the <!--SUGGEST_TRACKERS:...--> block at the end if the user described a health concern)
 
 Begin!
 
@@ -108,8 +144,8 @@ async def handle_chat_message(
         agent=agent,
         tools=AGENT_TOOLS,
         memory=memory,
-        max_iterations=3,               # Slightly lower cap for interactive chat
-        max_execution_time=45,
+        max_iterations=6,               # Enough for tool calls + Final Answer
+        max_execution_time=60,
         verbose=False,
         handle_parsing_errors=True,
         return_intermediate_steps=True,
@@ -124,7 +160,35 @@ async def handle_chat_message(
             [],
         )
 
-    response_text = result.get("output", "I'm not sure how to respond to that.")
+    _LIMIT_PHRASES = (
+        "agent stopped due to iteration limit",
+        "agent stopped due to time limit",
+        "iteration limit",
+        "time limit",
+    )
+    raw_output = result.get("output", "")
+    if not raw_output or any(p in raw_output.lower() for p in _LIMIT_PHRASES):
+        # The agent hit its budget without a clean Final Answer — build one from
+        # whatever intermediate steps were completed instead of leaking the error.
+        completed = [
+            step[0].log.strip()
+            for step in result.get("intermediate_steps", [])
+            if step and hasattr(step[0], "log") and step[0].log.strip()
+        ]
+        if completed:
+            response_text = (
+                "I've gathered some information for you, though I ran into a "
+                "processing limit before I could finish. Here's what I found so far:\n\n"
+                + "\n".join(f"• {s}" for s in completed[-3:])
+                + "\n\nPlease ask a more specific question and I'll answer fully."
+            )
+        else:
+            response_text = (
+                "I'm having a bit of trouble processing that right now. "
+                "Could you try rephrasing your question? I'm here to help!"
+            )
+    else:
+        response_text = raw_output
     tools_used: List[str] = []
     for step in result.get("intermediate_steps", []):
         if step and len(step) >= 1:

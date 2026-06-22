@@ -398,6 +398,8 @@ async def run_agent(
 
     task = (
         f"Patient ID       : {user_id}\n"
+        f"Conditions       : {', '.join(context.get('conditions', [])) or 'None recorded'}\n"
+        f"Medications      : {json.dumps(context.get('medications', []), default=str) if context.get('medications') else 'None recorded'}\n"
         f"Doctor Rules     : {context.get('doctor_instructions', 'None provided')}\n"
         f"Vitals Preview   : {json.dumps(context.get('vitals_preview', []), default=str)}\n"
         f"Today Compliance : {json.dumps(context.get('compliance', {}), default=str)}\n"
@@ -405,7 +407,7 @@ async def run_agent(
         "TASK: Run a complete monitoring cycle. Steps:\n"
         "  1. Fetch the full vitals trend (last 7 days) via get_vitals_trend.\n"
         "  2. Check today's compliance via check_compliance.\n"
-        "  3. Evaluate all metrics against the doctor's rules.\n"
+        "  3. Evaluate all metrics against the doctor's rules and known conditions/medications.\n"
         "  4. If any threshold is breached → send_alert with appropriate severity.\n"
         "  5. Log your reasoning via log_action.\n"
         "  6. Update the clinical summary via update_summary.\n"

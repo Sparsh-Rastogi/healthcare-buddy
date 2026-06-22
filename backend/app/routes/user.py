@@ -20,7 +20,11 @@ router = APIRouter(prefix="/users", tags=["Users"])
 
 
 def _sanitize(doc: dict) -> dict:
-    """Remove internal MongoDB fields and encrypted key before returning."""
+    """Remove internal MongoDB fields and encrypted key before returning.
+
+    conditions and medications are safe to return — only the Fernet-encrypted
+    groq_api_key must be masked.
+    """
     doc.pop("_id", None)
     doc.pop("groq_api_key", None)
     return doc

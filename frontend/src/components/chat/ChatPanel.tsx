@@ -6,8 +6,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { chatCompletion, GroqError, getApiKey } from "@/lib/groq";
 import { chatApi } from "@/lib/baymax-api";
 import { KEYS, readLS } from "@/lib/storage";
-import type { ChatMessage } from "@/lib/types";
+import type { ChatMessage, TrackerSuggestion } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { TrackerSuggestionCard } from "@/components/chat/TrackerSuggestionCard";
 
 interface Props {
   systemPrompt: string;
@@ -38,6 +39,26 @@ export function ChatPanel({
 
   const [sessionId, setSessionId] = useState<string | undefined>();
 
+  /**
+   * Extract <!--SUGGEST_TRACKERS:[...]-->  from an assistant reply.
+   * Returns the clean display text and the parsed suggestions array.
+   */
+  function parseSuggestions(text: string): {
+    cleanText: string;
+    suggestions: TrackerSuggestion[];
+  } {
+    const match = text.match(/<!--SUGGEST_TRACKERS:(\[.*?\])-->/s);
+    if (!match) return { cleanText: text, suggestions: [] };
+    try {
+      const suggestions: TrackerSuggestion[] = JSON.parse(match[1]);
+      const cleanText = text.replace(match[0], "").trim();
+      return { cleanText, suggestions };
+    } catch {
+      // Malformed JSON from LLM — just strip the block
+      return { cleanText: text.replace(match[0], "").trim(), suggestions: [] };
+    }
+  }
+
   const send = async () => {
     const text = input.trim();
     if (!text || loading) return;
@@ -58,8 +79,9 @@ export function ChatPanel({
         try {
           const res = await chatApi.message({ message: text, session_id: sessionId });
           setSessionId(res.session_id);
-          setMessages((m) => [...m, { role: "assistant", content: res.baymax_response }]);
-          onAssistant?.(res.baymax_response);
+          const { cleanText, suggestions } = parseSuggestions(res.baymax_response);
+          setMessages((m) => [...m, { role: "assistant", content: cleanText, suggestions }]);
+          onAssistant?.(cleanText);
           return;
         } catch {
           if (!getApiKey()) throw new Error("Backend unavailable and no Groq key configured.");
@@ -69,8 +91,9 @@ export function ChatPanel({
       const reply = await chatCompletion({
         messages: [{ role: "system", content: systemPrompt }, ...next],
       });
-      setMessages((m) => [...m, { role: "assistant", content: reply }]);
-      onAssistant?.(reply);
+      const { cleanText, suggestions } = parseSuggestions(reply);
+      setMessages((m) => [...m, { role: "assistant", content: cleanText, suggestions }]);
+      onAssistant?.(cleanText);
     } catch (e) {
       setError(e instanceof GroqError ? e.message : "Something went wrong. Please try again.");
     } finally {
@@ -90,15 +113,27 @@ export function ChatPanel({
           <div
             key={i}
             className={cn(
-              "max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm",
-              m.role === "user"
-                ? "ml-auto bg-primary text-primary-foreground"
-                : "bg-muted text-foreground",
+              "flex flex-col gap-1",
+              m.role === "user" ? "items-end" : "items-start",
             )}
           >
-            <div className="prose prose-sm max-w-none prose-p:my-1 prose-li:my-0">
-              <ReactMarkdown>{m.content}</ReactMarkdown>
+            <div
+              className={cn(
+                "max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm",
+                m.role === "user"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-foreground",
+              )}
+            >
+              <div className="prose prose-sm max-w-none prose-p:my-1 prose-li:my-0">
+                <ReactMarkdown>{m.content}</ReactMarkdown>
+              </div>
             </div>
+            {m.role === "assistant" && m.suggestions && m.suggestions.length > 0 && (
+              <div className="w-[85%]">
+                <TrackerSuggestionCard suggestions={m.suggestions} />
+              </div>
+            )}
           </div>
         ))}
         {loading && (

@@ -65,6 +65,8 @@ async def _build_user_context(user_id: str, profile: dict) -> dict:
 
     return {
         "doctor_instructions": profile.get("doctor_instructions", "No instructions provided."),
+        "conditions": profile.get("conditions", []),
+        "medications": profile.get("medications", []),
         "vitals_preview": vitals_preview,
         "compliance": {
             "date": today_str,

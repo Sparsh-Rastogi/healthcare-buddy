@@ -100,11 +100,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signUp = useCallback(async (email: string, password: string) => {
     const supabase = getSupabase();
     if (!supabase) throw new Error("Supabase is not configured. Use demo sign-in or add env vars.");
-
     const { data, error } = await supabase.auth.signUp({ email, password });
+    console.log(error);
     if (error) throw error;
 
     if (data.session?.user) {
+      console.log(data);
       const next: AuthUser = { id: data.session.user.id, email: data.session.user.email ?? email };
       persistSession(data.session.access_token, next, false);
       setUser(next);

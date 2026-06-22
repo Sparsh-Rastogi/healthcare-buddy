@@ -1,0 +1,25 @@
+# /Healthcare-Buddy/frontend/.gitignore
+
+# Node logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Node dependencies
+node_modules
+
+# Production builds & Framework output artifacts
+dist
+dist-ssr
+.output
+.vinxi
+.nitro
+
+# TanStack Router code-generation cache
+.tanstack/**
+
+# Cloudflare / Wrangler edge workers cache
+.wrangler/
+.dev.vars

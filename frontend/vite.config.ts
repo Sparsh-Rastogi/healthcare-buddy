@@ -7,6 +7,13 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
+  nitro: {
+    // Use the Vercel preset so `vite build` (called by vercel-build) outputs
+    // to `.vercel/output` — the directory Vercel expects. When NITRO_PRESET
+    // is set in the Vercel environment this is auto-detected, but hard-pinning
+    // here guarantees correctness in all cases.
+    preset: "vercel",
+  },
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this
@@ -28,3 +35,4 @@ export default defineConfig({
     },
   },
 });
+

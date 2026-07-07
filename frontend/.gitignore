@@ -16,6 +16,7 @@ dist-ssr
 .output
 .vinxi
 .nitro
+.vercel
 
 # TanStack Router code-generation cache
 .tanstack/**

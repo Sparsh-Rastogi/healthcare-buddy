@@ -3,5 +3,8 @@
   "buildCommand": "npm run vercel-build",
   "outputDirectory": ".vercel/output",
   "framework": null,
-  "installCommand": "npm install --legacy-peer-deps"
+  "installCommand": "npm install --legacy-peer-deps",
+  "env": {
+    "NITRO_PRESET": "vercel"
+  }
 }

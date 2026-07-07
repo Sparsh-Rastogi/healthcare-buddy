@@ -11,7 +11,7 @@ import type { ActivityItem, Profile } from "@/lib/types";
 import { SideDrawerNav } from "./SideDrawer";
 import { ChatFAB } from "./ChatFAB";
 
-const PUBLIC_PATHS = ["/login"];
+const PUBLIC_PATHS = ["/login", "/"];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();

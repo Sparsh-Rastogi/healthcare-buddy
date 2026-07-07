@@ -20,6 +20,17 @@ export default defineConfig({
     server: { entry: "server" },
   },
   vite: {
+    // react-is is a CJS-only package (no `module`/`exports` field) that recharts
+    // imports via an ES static import inside its ESM build. Rollup cannot resolve
+    // bare CJS packages on its own, so we tell Vite/esbuild to pre-bundle it
+    // (CJS → ESM conversion) for the client build, and mark it noExternal so the
+    // SSR/Nitro build bundles it too instead of leaving a bare require().
+    optimizeDeps: {
+      include: ["react-is"],
+    },
+    ssr: {
+      noExternal: ["react-is"],
+    },
     server: {
       proxy: {
         // Proxy API calls to the FastAPI backend during local dev

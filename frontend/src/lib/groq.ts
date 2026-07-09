@@ -42,7 +42,7 @@ export async function chatCompletion(opts: {
   const lastUserMsg = [...opts.messages].reverse().find((m) => m.role === "user")?.content;
   if (lastUserMsg) {
     try {
-      const resp = await chatApi.send(lastUserMsg, opts.sessionId);
+      const resp = await chatApi.message({ message: lastUserMsg, session_id: opts.sessionId });
       return resp.baymax_response;
     } catch (err) {
       // Only fall through to direct Groq if the backend is genuinely unreachable

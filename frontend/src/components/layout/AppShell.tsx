@@ -11,14 +11,20 @@ import type { ActivityItem, Profile } from "@/lib/types";
 import { SideDrawerNav } from "./SideDrawer";
 import { ChatFAB } from "./ChatFAB";
 
-const PUBLIC_PATHS = ["/login", "/"];
+// "/" is public only for unauthenticated visitors (landing page);
+// logged-in users on "/" must get the full shell with nav + side drawer.
+const ALWAYS_PUBLIC = ["/login"];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const path = useRouterState({ select: (s) => s.location.pathname });
-  const isPublic = PUBLIC_PATHS.some((p) => path.startsWith(p));
-  const isOnboarding = path.startsWith("/onboarding");
   const { user, loading, signOut } = useAuth();
+  // "/" is treated as public only when the user is not signed in (shows landing page).
+  // Once authenticated, "/" is a protected route and gets the full shell.
+  const isAlwaysPublic = ALWAYS_PUBLIC.some((p) => path.startsWith(p));
+  const isPublic = isAlwaysPublic || (path === "/" && !user && !loading);
+  const isOnboarding = path.startsWith("/onboarding");
+
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [bellOpen, setBellOpen] = useState(false);
   const [profile] = useLocalState<Profile | null>(KEYS.profile, null);

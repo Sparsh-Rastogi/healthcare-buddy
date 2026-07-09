@@ -105,6 +105,55 @@ Thought:{agent_scratchpad}"""
 )
 
 
+import re
+
+
+# Matches any ReAct reasoning block that the agent should never expose to users.
+# Covers lines starting with Question:, Thought:, Action:, Action Input:, Observation:
+# as well as the repeated "Question: ..." prefix the model sometimes echoes.
+_REACT_LINE_RE = re.compile(
+    r"^\s*(Question|Thought|Action(?: Input)?|Observation)\s*:",
+    re.IGNORECASE,
+)
+
+
+def _strip_react_traces(text: str) -> str:
+    """
+    Remove internal ReAct reasoning lines from agent output.
+
+    The agent occasionally leaks its chain-of-thought scaffolding
+    (Question / Thought / Action / Action Input / Observation blocks)
+    into the response when:
+      • handle_parsing_errors=True lets a partially-formatted output through.
+      • The fallback path reads from step[0].log instead of the final answer.
+
+    This function removes every line that begins with a ReAct keyword and
+    collapses the remaining content into a clean response.
+    """
+    if not text:
+        return text
+
+    # Split on double-newline blocks first to handle multi-line Action Input JSON
+    # then fall back to line-by-line filtering.
+    lines = text.splitlines()
+    cleaned: list[str] = []
+    skip_block = False  # True while we're inside an Action Input JSON block
+
+    for line in lines:
+        if _REACT_LINE_RE.match(line):
+            skip_block = line.strip().lower().startswith("action input")
+            continue
+        if skip_block:
+            # Skip lines that are part of the JSON body following Action Input:
+            stripped = line.strip()
+            if stripped in ("}", "]}", "}]") or not stripped:
+                skip_block = False
+            continue
+        cleaned.append(line)
+
+    return "\n".join(cleaned).strip()
+
+
 async def handle_chat_message(
     user_id: str,
     session_id: str,
@@ -167,20 +216,22 @@ async def handle_chat_message(
         "time limit",
     )
     raw_output = result.get("output", "")
+
     if not raw_output or any(p in raw_output.lower() for p in _LIMIT_PHRASES):
-        # The agent hit its budget without a clean Final Answer — build one from
-        # whatever intermediate steps were completed instead of leaking the error.
-        completed = [
-            step[0].log.strip()
+        # The agent hit its budget without a clean Final Answer.
+        # Build a graceful fallback from the tool *observations* (actual data)
+        # rather than the agent *logs* (which contain raw ReAct reasoning text).
+        observations = [
+            str(step[1]).strip()
             for step in result.get("intermediate_steps", [])
-            if step and hasattr(step[0], "log") and step[0].log.strip()
+            if step and len(step) >= 2 and str(step[1]).strip()
         ]
-        if completed:
+        if observations:
             response_text = (
-                "I've gathered some information for you, though I ran into a "
-                "processing limit before I could finish. Here's what I found so far:\n\n"
-                + "\n".join(f"• {s}" for s in completed[-3:])
-                + "\n\nPlease ask a more specific question and I'll answer fully."
+                "I gathered some health data for you, but ran into a processing limit "
+                "before I could finish my full analysis. Here's what I found:\n\n"
+                + "\n\n".join(f"• {obs}" for obs in observations[-3:])
+                + "\n\nCould you ask a more specific question so I can give you a complete answer?"
             )
         else:
             response_text = (
@@ -188,7 +239,12 @@ async def handle_chat_message(
                 "Could you try rephrasing your question? I'm here to help!"
             )
     else:
-        response_text = raw_output
+        # Strip any ReAct reasoning that leaked into the final answer
+        response_text = _strip_react_traces(raw_output)
+
+    # Ensure no reasoning traces survive in any path
+    response_text = _strip_react_traces(response_text)
+
     tools_used: List[str] = []
     for step in result.get("intermediate_steps", []):
         if step and len(step) >= 1:
@@ -205,3 +261,4 @@ async def handle_chat_message(
 
     logger.info(f"[Chat] session={session_id} user={user_id} tools={tools_used}")
     return response_text, tools_used
+
